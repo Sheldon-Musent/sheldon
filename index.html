@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@300;400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --bg:        #080808;
@@ -855,14 +856,6 @@
     </div>
 
     <div class="a-block">
-      <div class="a-label">Publish</div>
-      <p style="font-family:var(--font-mono);font-size:10px;color:var(--mute-2);line-height:1.7;margin-bottom:1rem;">Export bakes your content into a new index.html. Replace the file in your GitHub repo and push — everyone sees it.</p>
-      <div class="m-row">
-        <button class="m-btn primary" onclick="exportHTML()">Export HTML ↓</button>
-      </div>
-    </div>
-
-    <div class="a-block">
       <div class="m-row">
         <button class="m-btn" onclick="doLogout()">Log Out</button>
         <button class="m-btn" onclick="close_('adminOverlay')">Close</button>
@@ -872,6 +865,17 @@
 </div>
 
 <script>
+  /* ── Supabase ── */
+  const SUPA_URL = 'https://fsafvjwfnvsdjpeyyhho.supabase.co';
+  const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzYWZ2andmbnZzZGpwZXl5aGhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzNDk5MjQsImV4cCI6MjA5MzkyNTkyNH0.PegE0tm5-au73H7nrsJ6kPoqtLv1AdXGAQR_zjG4EFo';
+  const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+  const BUCKET = 'portfolio';
+
+  function getPublicUrl(path) {
+    const { data } = supa.storage.from(BUCKET).getPublicUrl(path);
+    return data.publicUrl;
+  }
+
   /* ── Auth ── */
   const PW = 'sheldon42kl';
 
@@ -928,15 +932,15 @@
   });
 
   /* ── Profile pic ── */
-  function uploadPic(input) {
+  async function uploadPic(input) {
     const file = input.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      localStorage.setItem('s_pic', e.target.result);
-      showPic(e.target.result);
-    };
-    reader.readAsDataURL(file);
+    const ext = file.name.split('.').pop();
+    const { error } = await supa.storage.from(BUCKET).upload(`profile.${ext}`, file, { upsert: true });
+    if (error) { alert('Upload failed: ' + error.message); return; }
+    const url = getPublicUrl(`profile.${ext}`) + '?t=' + Date.now();
+    localStorage.setItem('s_pic_url', url);
+    showPic(url);
   }
 
   function showPic(src) {
@@ -958,16 +962,19 @@
   }
 
   /* ── Showcase ── */
-  function uploadShowcase(input) {
+  async function uploadShowcase(input) {
     const files = Array.from(input.files).slice(0, 4);
-    Promise.all(files.map(f => new Promise(res => {
-      const r = new FileReader();
-      r.onload = e => res(e.target.result);
-      r.readAsDataURL(f);
-    }))).then(imgs => {
-      localStorage.setItem('s_showcase', JSON.stringify(imgs));
-      renderShowcase(imgs);
-    });
+    const urls = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const ext = file.name.split('.').pop();
+      const path = `showcase/image${i + 1}.${ext}`;
+      const { error } = await supa.storage.from(BUCKET).upload(path, file, { upsert: true });
+      if (error) { alert('Upload failed: ' + error.message); return; }
+      urls.push(getPublicUrl(path) + '?t=' + Date.now());
+    }
+    localStorage.setItem('s_showcase_urls', JSON.stringify(urls));
+    renderShowcase(urls);
   }
 
   function renderShowcase(imgs) {
@@ -986,8 +993,14 @@
     ).join('');
   }
 
-  function clearShowcase() {
-    localStorage.removeItem('s_showcase');
+  async function clearShowcase() {
+    await supa.storage.from(BUCKET).remove([
+      'showcase/image1.jpg','showcase/image2.jpg',
+      'showcase/image3.jpg','showcase/image4.jpg',
+      'showcase/image1.png','showcase/image2.png',
+      'showcase/image3.png','showcase/image4.png'
+    ]);
+    localStorage.removeItem('s_showcase_urls');
     renderShowcase([]);
   }
 
@@ -1051,14 +1064,14 @@
 
   /* ── Init ── */
   (function init() {
-    const pic = localStorage.getItem('s_pic');
-    if (pic) showPic(pic);
+    const picUrl = localStorage.getItem('s_pic_url');
+    if (picUrl) showPic(picUrl);
 
     const about = localStorage.getItem('s_about');
     if (about) document.getElementById('aboutText').innerHTML = about;
 
-    const showcase = localStorage.getItem('s_showcase');
-    if (showcase) renderShowcase(JSON.parse(showcase));
+    const showcaseUrls = localStorage.getItem('s_showcase_urls');
+    if (showcaseUrls) renderShowcase(JSON.parse(showcaseUrls));
 
     if (loggedIn()) document.getElementById('adminBtn').classList.add('show');
   })();
