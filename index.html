@@ -935,10 +935,11 @@
   async function uploadPic(input) {
     const file = input.files[0];
     if (!file) return;
-    const ext = file.name.split('.').pop();
-    const { error } = await supa.storage.from(BUCKET).upload(`profile.${ext}`, file, { upsert: true });
+    const ext = file.name.split('.').pop().toLowerCase();
+    const path = `profile.${ext}`;
+    const { error } = await supa.storage.from(BUCKET).upload(path, file, { upsert: true });
     if (error) { alert('Upload failed: ' + error.message); return; }
-    const url = getPublicUrl(`profile.${ext}`) + '?t=' + Date.now();
+    const url = getPublicUrl(path) + '?t=' + Date.now();
     localStorage.setItem('s_pic_url', url);
     showPic(url);
   }
@@ -1063,18 +1064,37 @@
   sections.forEach(s => spy.observe(s));
 
   /* ── Init ── */
-  (function init() {
-    const picUrl = localStorage.getItem('s_pic_url');
-    if (picUrl) showPic(picUrl);
+  async function init() {
+    // Load profile pic directly from Supabase (works on all devices)
+    const exts = ['jpeg', 'jpg', 'png', 'webp'];
+    for (const ext of exts) {
+      const url = getPublicUrl(`profile.${ext}`);
+      try {
+        const res = await fetch(url, { method: 'HEAD' });
+        if (res.ok) { showPic(url + '?t=' + Date.now()); break; }
+      } catch(e) {}
+    }
+
+    // Load showcase from Supabase directly
+    const showcaseUrls = [];
+    for (let i = 1; i <= 4; i++) {
+      for (const ext of ['jpeg', 'jpg', 'png', 'webp']) {
+        const url = getPublicUrl(`showcase/image${i}.${ext}`);
+        try {
+          const res = await fetch(url, { method: 'HEAD' });
+          if (res.ok) { showcaseUrls.push(url + '?t=' + Date.now()); break; }
+        } catch(e) {}
+      }
+    }
+    if (showcaseUrls.length > 0) renderShowcase(showcaseUrls);
 
     const about = localStorage.getItem('s_about');
     if (about) document.getElementById('aboutText').innerHTML = about;
 
-    const showcaseUrls = localStorage.getItem('s_showcase_urls');
-    if (showcaseUrls) renderShowcase(JSON.parse(showcaseUrls));
-
     if (loggedIn()) document.getElementById('adminBtn').classList.add('show');
-  })();
+  }
+
+  init();
 </script>
 </body>
 </html>
