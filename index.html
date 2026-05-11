@@ -330,6 +330,29 @@
 
     body.is-admin .project-link-input { display: block; }
 
+    .project-hidden { display: none; }
+    .projects-expanded .project-hidden:not(.project-empty) { display: flex; }
+
+    .project-empty { display: none; }
+
+    body.is-admin .project-hidden,
+    body.is-admin .project-empty { display: flex; }
+
+    .project-toggle {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--mute-3);
+      cursor: pointer;
+      margin-top: 1rem;
+      transition: color 0.2s;
+    }
+
+    .project-toggle:hover { color: var(--white); }
+    body.is-admin .project-toggle { display: none !important; }
+
     /* ── Current work ── */
     .current-meta {
       font-family: var(--font-mono);
@@ -889,6 +912,70 @@
       </div>
       <input class="project-link-input" id="project3LinkInput" type="url" placeholder="https://…" value="https://github.com/Sheldon-Musent/Pitgoal">
 
+      <div class="project-item project-hidden project-empty">
+        <div>
+          <div class="project-name" id="project4Name"></div>
+          <div class="project-desc"></div>
+        </div>
+        <a id="project4Link" class="project-link pending">Soon</a>
+      </div>
+      <input class="project-link-input" id="project4LinkInput" type="url" placeholder="https://…">
+
+      <div class="project-item project-hidden project-empty">
+        <div>
+          <div class="project-name" id="project5Name"></div>
+          <div class="project-desc"></div>
+        </div>
+        <a id="project5Link" class="project-link pending">Soon</a>
+      </div>
+      <input class="project-link-input" id="project5LinkInput" type="url" placeholder="https://…">
+
+      <div class="project-item project-hidden project-empty">
+        <div>
+          <div class="project-name" id="project6Name"></div>
+          <div class="project-desc"></div>
+        </div>
+        <a id="project6Link" class="project-link pending">Soon</a>
+      </div>
+      <input class="project-link-input" id="project6LinkInput" type="url" placeholder="https://…">
+
+      <div class="project-item project-hidden project-empty">
+        <div>
+          <div class="project-name" id="project7Name"></div>
+          <div class="project-desc"></div>
+        </div>
+        <a id="project7Link" class="project-link pending">Soon</a>
+      </div>
+      <input class="project-link-input" id="project7LinkInput" type="url" placeholder="https://…">
+
+      <div class="project-item project-hidden project-empty">
+        <div>
+          <div class="project-name" id="project8Name"></div>
+          <div class="project-desc"></div>
+        </div>
+        <a id="project8Link" class="project-link pending">Soon</a>
+      </div>
+      <input class="project-link-input" id="project8LinkInput" type="url" placeholder="https://…">
+
+      <div class="project-item project-hidden project-empty">
+        <div>
+          <div class="project-name" id="project9Name"></div>
+          <div class="project-desc"></div>
+        </div>
+        <a id="project9Link" class="project-link pending">Soon</a>
+      </div>
+      <input class="project-link-input" id="project9LinkInput" type="url" placeholder="https://…">
+
+      <div class="project-item project-hidden project-empty">
+        <div>
+          <div class="project-name" id="project10Name"></div>
+          <div class="project-desc"></div>
+        </div>
+        <a id="project10Link" class="project-link pending">Soon</a>
+      </div>
+      <input class="project-link-input" id="project10LinkInput" type="url" placeholder="https://…">
+
+      <a class="project-toggle" id="projectToggle" onclick="toggleMoreProjects()">+ more projects</a>
     </section>
 
     <!-- Experience -->
@@ -1294,19 +1381,27 @@
     const inputEl = document.getElementById('project' + i + 'LinkInput');
     if (nameEl && name != null) nameEl.textContent = name;
     if (inputEl && url != null) inputEl.value = (url || '').trim();
-    if (!linkEl) return;
-    const trimmed = (url || '').trim();
-    if (!trimmed || trimmed.toLowerCase() === 'soon') {
-      linkEl.classList.add('pending');
-      linkEl.removeAttribute('href');
-      linkEl.removeAttribute('target');
-      linkEl.textContent = 'Soon';
-    } else {
-      linkEl.classList.remove('pending');
-      linkEl.href = trimmed;
-      linkEl.target = '_blank';
-      linkEl.rel = 'noopener';
-      linkEl.textContent = /github\.com/i.test(trimmed) ? 'GitHub ↗' : 'Live ↗';
+    if (linkEl && url != null) {
+      const trimmed = (url || '').trim();
+      if (!trimmed || trimmed.toLowerCase() === 'soon') {
+        linkEl.classList.add('pending');
+        linkEl.removeAttribute('href');
+        linkEl.removeAttribute('target');
+        linkEl.textContent = 'Soon';
+      } else {
+        linkEl.classList.remove('pending');
+        linkEl.href = trimmed;
+        linkEl.target = '_blank';
+        linkEl.rel = 'noopener';
+        linkEl.textContent = /github\.com/i.test(trimmed) ? 'GitHub ↗' : 'Live ↗';
+      }
+    }
+    const itemEl = nameEl ? nameEl.closest('.project-item') : null;
+    if (itemEl && nameEl && linkEl) {
+      const cleanName = nameEl.textContent.trim();
+      const hasUrl = !linkEl.classList.contains('pending') && linkEl.hasAttribute('href');
+      if (!cleanName && !hasUrl) itemEl.classList.add('project-empty');
+      else itemEl.classList.remove('project-empty');
     }
   }
 
@@ -1346,7 +1441,7 @@
   async function saveProjects() {
     const updates = [];
     const collected = [];
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 10; i++) {
       const nameEl = document.getElementById('project' + i + 'Name');
       const inputEl = document.getElementById('project' + i + 'LinkInput');
       if (!nameEl) continue;
@@ -1362,6 +1457,25 @@
       .upsert(updates, { onConflict: 'key' });
     if (error) { alert('Save failed: ' + error.message); return; }
     for (const { i, name, url } of collected) applyProject(i, name, url);
+    updateProjectToggleVisibility();
+  }
+
+  function toggleMoreProjects() {
+    const section = document.getElementById('current');
+    const toggle = document.getElementById('projectToggle');
+    section.classList.toggle('projects-expanded');
+    toggle.textContent = section.classList.contains('projects-expanded') ? '− less' : '+ more projects';
+  }
+
+  function updateProjectToggleVisibility() {
+    const toggle = document.getElementById('projectToggle');
+    if (!toggle) return;
+    let hasContent = false;
+    for (let i = 4; i <= 10; i++) {
+      const nameEl = document.getElementById('project' + i + 'Name');
+      if (nameEl && nameEl.textContent.trim()) { hasContent = true; break; }
+    }
+    toggle.style.display = hasContent ? 'inline-block' : 'none';
   }
 
   /* ── Resume PDF ── */
@@ -1543,11 +1657,12 @@
         applyProfilePos();
       }
     }
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 10; i++) {
       const name = map['project' + i + '_name'];
       const url  = map['project' + i + '_link'];
       if (name != null || url != null) applyProject(i, name, url);
     }
+    updateProjectToggleVisibility();
 
     setupProfileInteractions();
     setupShowcaseGridDrag();
