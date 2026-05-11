@@ -300,7 +300,8 @@
     .about-text p { margin-bottom: 1rem; }
     .about-text p:last-child { margin-bottom: 0; }
 
-    body.is-admin #aboutText {
+    body.is-admin #aboutText,
+    body.is-admin #currentDesc {
       border: 1px dashed var(--border-2);
       padding: 0.75rem 1rem;
       outline: none;
@@ -1015,6 +1016,7 @@
 
   async function saveAndExit() {
     await saveAbout();
+    await saveCurrentDesc();
     localStorage.removeItem('s_auth');
     setAdminBodyClass();
   }
@@ -1167,6 +1169,11 @@
       if (isAdmin) aboutEl.setAttribute('contenteditable', 'true');
       else aboutEl.removeAttribute('contenteditable');
     }
+    const currentEl = document.getElementById('currentDesc');
+    if (currentEl) {
+      if (isAdmin) currentEl.setAttribute('contenteditable', 'true');
+      else currentEl.removeAttribute('contenteditable');
+    }
   }
 
   /* ── Showcase drag-reorder ── */
@@ -1277,11 +1284,13 @@
 
   /* ── Current Work ── */
   async function saveCurrentDesc() {
-    const v = document.getElementById('currentDescInput').value.trim();
+    const el = document.getElementById('currentDesc');
+    if (!el) return;
+    const v = (el.innerText || '').trim();
     if (!v) return;
     const ok = await setContent('current_desc', v);
     if (!ok) return;
-    document.getElementById('currentDesc').textContent = v;
+    el.textContent = v;
   }
 
   /* ── Projects ── */
