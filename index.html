@@ -308,6 +308,28 @@
       outline: none;
     }
 
+    body.is-admin .project-name {
+      border: 1px dashed var(--border-2);
+      padding: 0.25rem 0.5rem;
+      outline: none;
+    }
+
+    .project-link-input {
+      display: none;
+      width: 100%;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--mute-2);
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border-2);
+      padding: 0.4rem 0;
+      margin-bottom: 0.5rem;
+      outline: none;
+    }
+
+    body.is-admin .project-link-input { display: block; }
+
     /* ── Current work ── */
     .current-meta {
       font-family: var(--font-mono);
@@ -847,6 +869,7 @@
         </div>
         <a id="project1Link" href="https://sheldon-musent.github.io/chasecase42/" target="_blank" class="project-link">Live ↗</a>
       </div>
+      <input class="project-link-input" id="project1LinkInput" type="url" placeholder="https://…" value="https://sheldon-musent.github.io/chasecase42/">
 
       <div class="project-item">
         <div>
@@ -855,6 +878,7 @@
         </div>
         <a id="project2Link" href="https://studio-agency-lovat.vercel.app" target="_blank" class="project-link">Live ↗</a>
       </div>
+      <input class="project-link-input" id="project2LinkInput" type="url" placeholder="https://…" value="https://studio-agency-lovat.vercel.app">
 
       <div class="project-item">
         <div>
@@ -863,6 +887,7 @@
         </div>
         <a id="project3Link" href="https://github.com/Sheldon-Musent/Pitgoal" target="_blank" class="project-link">GitHub ↗</a>
       </div>
+      <input class="project-link-input" id="project3LinkInput" type="url" placeholder="https://…" value="https://github.com/Sheldon-Musent/Pitgoal">
 
     </section>
 
@@ -1019,6 +1044,7 @@
     await saveAbout();
     await saveCurrentDesc();
     await saveCurrentMeta();
+    await saveProjects();
     localStorage.removeItem('s_auth');
     setAdminBodyClass();
   }
@@ -1181,6 +1207,10 @@
       if (isAdmin) metaEl.setAttribute('contenteditable', 'true');
       else metaEl.removeAttribute('contenteditable');
     }
+    document.querySelectorAll('.project-name').forEach(el => {
+      if (isAdmin) el.setAttribute('contenteditable', 'true');
+      else el.removeAttribute('contenteditable');
+    });
   }
 
   /* ── Showcase drag-reorder ── */
@@ -1261,7 +1291,9 @@
   function applyProject(i, name, url) {
     const nameEl = document.getElementById('project' + i + 'Name');
     const linkEl = document.getElementById('project' + i + 'Link');
+    const inputEl = document.getElementById('project' + i + 'LinkInput');
     if (nameEl && name != null) nameEl.textContent = name;
+    if (inputEl && url != null) inputEl.value = (url || '').trim();
     if (!linkEl) return;
     const trimmed = (url || '').trim();
     if (!trimmed || trimmed.toLowerCase() === 'soon') {
@@ -1313,21 +1345,23 @@
   /* ── Projects ── */
   async function saveProjects() {
     const updates = [];
+    const collected = [];
     for (let i = 1; i <= 4; i++) {
-      const name = document.getElementById('proj' + i + 'NameInput').value.trim();
-      const url  = document.getElementById('proj' + i + 'LinkInput').value.trim();
+      const nameEl = document.getElementById('project' + i + 'Name');
+      const inputEl = document.getElementById('project' + i + 'LinkInput');
+      if (!nameEl) continue;
+      const name = (nameEl.innerText || '').trim();
+      const url = inputEl ? inputEl.value.trim() : '';
       updates.push({ key: 'project' + i + '_name', value: name });
       updates.push({ key: 'project' + i + '_link', value: url });
+      collected.push({ i, name, url });
     }
+    if (updates.length === 0) return;
     const { error } = await supa
       .from('content')
       .upsert(updates, { onConflict: 'key' });
     if (error) { alert('Save failed: ' + error.message); return; }
-    for (let i = 1; i <= 4; i++) {
-      const name = document.getElementById('proj' + i + 'NameInput').value.trim();
-      const url  = document.getElementById('proj' + i + 'LinkInput').value.trim();
-      applyProject(i, name, url);
-    }
+    for (const { i, name, url } of collected) applyProject(i, name, url);
   }
 
   /* ── Resume PDF ── */
