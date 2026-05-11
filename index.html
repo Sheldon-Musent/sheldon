@@ -300,6 +300,12 @@
     .about-text p { margin-bottom: 1rem; }
     .about-text p:last-child { margin-bottom: 0; }
 
+    body.is-admin #aboutText {
+      border: 1px dashed var(--border-2);
+      padding: 0.75rem 1rem;
+      outline: none;
+    }
+
     /* ── Current work ── */
     .current-meta {
       font-family: var(--font-mono);
@@ -1007,7 +1013,8 @@
     setAdminBodyClass();
   }
 
-  function saveAndExit() {
+  async function saveAndExit() {
+    await saveAbout();
     localStorage.removeItem('s_auth');
     setAdminBodyClass();
   }
@@ -1155,6 +1162,11 @@
       if (isAdmin) c.setAttribute('draggable', 'true');
       else c.removeAttribute('draggable');
     });
+    const aboutEl = document.getElementById('aboutText');
+    if (aboutEl) {
+      if (isAdmin) aboutEl.setAttribute('contenteditable', 'true');
+      else aboutEl.removeAttribute('contenteditable');
+    }
   }
 
   /* ── Showcase drag-reorder ── */
@@ -1254,12 +1266,13 @@
 
   /* ── About ── */
   async function saveAbout() {
-    const raw = document.getElementById('aboutInput').value.trim();
+    const el = document.getElementById('aboutText');
+    if (!el) return;
+    const raw = (el.innerText || '').trim();
     if (!raw) return;
-    const html = aboutTextToHtml(raw);
     const ok = await setContent('about', raw);
     if (!ok) return;
-    document.getElementById('aboutText').innerHTML = html;
+    el.innerHTML = aboutTextToHtml(raw);
   }
 
   /* ── Current Work ── */
