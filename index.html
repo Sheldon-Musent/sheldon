@@ -423,41 +423,69 @@
 
     /* ── Showcase ── */
     .showcase-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1px;
-      background: var(--border);
+      column-count: 3;
+      column-gap: 4px;
       margin-top: 0.5rem;
     }
 
     .showcase-cell {
-      background: var(--bg-2);
-      aspect-ratio: 4/3;
-      overflow: hidden;
-      position: relative;
+      display: block;
+      width: 100%;
+      margin-bottom: 4px;
+      break-inside: avoid;
     }
 
     .showcase-cell img {
       width: 100%;
-      height: 100%;
-      object-fit: cover;
+      height: auto;
+      display: block;
       filter: grayscale(60%);
+      cursor: pointer;
       transition: filter 0.4s ease;
     }
 
-    .showcase-cell:hover img { filter: grayscale(0%); }
+    .showcase-cell img:hover { filter: grayscale(0%); }
 
-    .showcase-empty {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .showcase-add,
+    .showcase-clear {
+      display: none;
       font-family: var(--font-mono);
       font-size: 9px;
-      color: var(--mute-4);
-      letter-spacing: 3px;
+      letter-spacing: 2px;
       text-transform: uppercase;
+      color: var(--mute-3);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .showcase-add:hover,
+    .showcase-clear:hover { color: var(--white); }
+
+    .showcase-add { margin-bottom: 1rem; }
+    .showcase-clear { margin-top: 1rem; }
+
+    body.is-admin .showcase-add,
+    body.is-admin .showcase-clear { display: inline-block; }
+
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 8, 8, 0.95);
+      z-index: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      cursor: pointer;
+    }
+
+    .lightbox.show { display: flex; }
+
+    .lightbox img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      cursor: default;
     }
 
     /* ── Skills ── */
@@ -684,6 +712,7 @@
       nav { display: none; }
       .name { font-size: 2.2rem; }
       .skills-block { grid-template-columns: 1fr; gap: 1.5rem; }
+      .showcase-grid { column-count: 2; }
     }
   </style>
 </head>
@@ -844,12 +873,10 @@
     <!-- Showcase -->
     <section class="section" id="showcase">
       <div class="section-label">Showcase</div>
-      <div class="showcase-grid" id="showcaseGrid">
-        <div class="showcase-cell"><div class="showcase-empty">Upload</div></div>
-        <div class="showcase-cell"><div class="showcase-empty">Upload</div></div>
-        <div class="showcase-cell"><div class="showcase-empty">Upload</div></div>
-        <div class="showcase-cell"><div class="showcase-empty">Upload</div></div>
-      </div>
+      <a class="showcase-add" onclick="document.getElementById('showcaseUpload').click()">↑ Add photos</a>
+      <input type="file" id="showcaseUpload" accept="image/*" multiple style="display:none" onchange="uploadShowcase(this)">
+      <div class="showcase-grid" id="showcaseGrid"></div>
+      <a class="showcase-clear" onclick="clearShowcase()">Clear all</a>
     </section>
 
     <!-- Skills -->
@@ -880,6 +907,11 @@
     </div>
 
   </main>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <img id="lightboxImg" alt="">
 </div>
 
 <!-- Login modal -->
@@ -1176,45 +1208,62 @@
 
   /* ── Showcase ── */
   async function uploadShowcase(input) {
-    const files = Array.from(input.files).slice(0, 4);
-    const urls = [];
+    const files = Array.from(input.files);
+    if (files.length === 0) return;
+    const ts = Date.now();
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const ext = file.name.split('.').pop();
-      const path = `showcase/image${i + 1}.${ext}`;
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const path = `showcase/image_${ts}_${i}.${ext}`;
       const { error } = await supa.storage.from(BUCKET).upload(path, file, { upsert: true });
       if (error) { alert('Upload failed: ' + error.message); return; }
-      urls.push(getPublicUrl(path) + '?t=' + Date.now());
     }
-    localStorage.setItem('s_showcase_urls', JSON.stringify(urls));
+    input.value = '';
+    await loadShowcase();
+  }
+
+  async function loadShowcase() {
+    const { data, error } = await supa.storage.from(BUCKET).list('showcase');
+    if (error) { console.error('Showcase load failed:', error); renderShowcase([]); return; }
+    const urls = (data || [])
+      .filter(f => f.name && !f.name.endsWith('/'))
+      .map(f => getPublicUrl(`showcase/${f.name}`) + '?t=' + Date.now());
     renderShowcase(urls);
   }
 
   function renderShowcase(imgs) {
     const grid = document.getElementById('showcaseGrid');
     if (!imgs || imgs.length === 0) {
-      grid.innerHTML = [1,2,3,4].map(() =>
-        `<div class="showcase-cell"><div class="showcase-empty">Upload</div></div>`
-      ).join('');
+      grid.innerHTML = '';
       return;
     }
-    const cells = [...imgs];
-    while (cells.length < 4) cells.push(null);
-    grid.innerHTML = cells.slice(0,4).map(src => src
-      ? `<div class="showcase-cell"><img src="${src}" alt="Showcase"></div>`
-      : `<div class="showcase-cell"><div class="showcase-empty">Upload</div></div>`
+    grid.innerHTML = imgs.map(src =>
+      `<div class="showcase-cell"><img src="${src}" alt="Showcase" onclick="openLightbox('${src}')"></div>`
     ).join('');
   }
 
   async function clearShowcase() {
-    await supa.storage.from(BUCKET).remove([
-      'showcase/image1.jpg','showcase/image2.jpg',
-      'showcase/image3.jpg','showcase/image4.jpg',
-      'showcase/image1.png','showcase/image2.png',
-      'showcase/image3.png','showcase/image4.png'
-    ]);
-    localStorage.removeItem('s_showcase_urls');
+    if (!confirm('Remove all showcase images?')) return;
+    const { data, error } = await supa.storage.from(BUCKET).list('showcase');
+    if (error) { alert('List failed: ' + error.message); return; }
+    const paths = (data || []).filter(f => f.name && !f.name.endsWith('/')).map(f => `showcase/${f.name}`);
+    if (paths.length > 0) {
+      const { error: rmError } = await supa.storage.from(BUCKET).remove(paths);
+      if (rmError) { alert('Clear failed: ' + rmError.message); return; }
+    }
     renderShowcase([]);
+  }
+
+  /* ── Lightbox ── */
+  function openLightbox(src) {
+    const img = document.getElementById('lightboxImg');
+    img.src = src;
+    document.getElementById('lightbox').classList.add('show');
+  }
+
+  function closeLightbox(e) {
+    if (e && e.target && e.target.tagName === 'IMG') return;
+    document.getElementById('lightbox').classList.remove('show');
   }
 
   /* ── Scroll spy ── */
@@ -1245,18 +1294,8 @@
       } catch(e) {}
     }
 
-    // Load showcase from Supabase directly
-    const showcaseUrls = [];
-    for (let i = 1; i <= 4; i++) {
-      for (const ext of ['jpeg', 'jpg', 'png', 'webp']) {
-        const url = getPublicUrl(`showcase/image${i}.${ext}`);
-        try {
-          const res = await fetch(url, { method: 'HEAD' });
-          if (res.ok) { showcaseUrls.push(url + '?t=' + Date.now()); break; }
-        } catch(e) {}
-      }
-    }
-    if (showcaseUrls.length > 0) renderShowcase(showcaseUrls);
+    // Load showcase from Supabase
+    await loadShowcase();
 
     // Load resume PDF from Supabase if it exists
     try {
