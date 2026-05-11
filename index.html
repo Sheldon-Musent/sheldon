@@ -496,6 +496,27 @@
     .save-btn:hover { background: var(--text-2); }
     body.is-admin .save-btn { display: inline-block; }
 
+    .save-fab {
+      display: none;
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: transparent;
+      border: 1px solid var(--border-2);
+      color: var(--mute-2);
+      padding: 0.6rem 1.2rem;
+      cursor: pointer;
+      z-index: 100;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .save-fab:hover { color: var(--white); border-color: var(--mute-2); }
+    body.is-admin .save-fab { display: inline-block; }
+
     /* ── Modals ── */
     .overlay {
       position: fixed;
@@ -855,62 +876,8 @@
   </div>
 </div>
 
-<!-- Admin panel -->
-<div class="overlay" id="adminOverlay">
-  <div class="modal">
-    <div class="modal-head">Manage Content</div>
-
-    <div class="a-block">
-      <div class="a-label">Profile Photo</div>
-      <div class="upload-zone" onclick="document.getElementById('picUpload').click()">
-        Click to upload · JPG or PNG · under 500KB
-      </div>
-      <input type="file" id="picUpload" accept="image/*" style="display:none" onchange="uploadPic(this)">
-    </div>
-
-    <div class="a-block">
-      <div class="a-label">About Text</div>
-      <textarea id="aboutInput" placeholder="Write your about text here. Separate paragraphs with a blank line."></textarea>
-      <div class="m-row">
-        <button class="m-btn primary" onclick="saveAbout()">Save</button>
-      </div>
-    </div>
-
-    <div class="a-block">
-      <div class="a-label">Current Work Description</div>
-      <textarea id="currentDescInput" placeholder="Short description of what you're currently doing." style="min-height:80px;"></textarea>
-      <div class="m-row">
-        <button class="m-btn primary" onclick="saveCurrentDesc()">Save</button>
-      </div>
-    </div>
-
-    <div class="a-block">
-      <div class="a-label">Projects</div>
-      <div id="projectsInputs"></div>
-      <div class="m-row">
-        <button class="m-btn primary" onclick="saveProjects()">Save Projects</button>
-      </div>
-    </div>
-
-    <div class="a-block">
-      <div class="a-label">Showcase Images (max 4)</div>
-      <div class="upload-zone" onclick="document.getElementById('showcaseUpload').click()">
-        Click to upload · JPG or PNG · select up to 4
-      </div>
-      <input type="file" id="showcaseUpload" accept="image/*" multiple style="display:none" onchange="uploadShowcase(this)">
-      <div class="m-row" style="margin-top:0.75rem;">
-        <button class="m-btn" onclick="clearShowcase()">Clear All</button>
-      </div>
-    </div>
-
-    <div class="a-block">
-      <div class="m-row">
-        <button class="m-btn" onclick="doLogout()">Log Out</button>
-        <button class="m-btn" onclick="close_('adminOverlay')">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- Save button (visible when logged in) -->
+<button class="save-fab" id="saveFab" onclick="doLogout()">Save</button>
 
 <script>
   /* ── Supabase ── */
@@ -938,7 +905,6 @@
       document.getElementById('pwInput').value = '';
       err.style.display = 'none';
       setAdminBodyClass();
-      openPanel();
     } else {
       err.style.display = 'block';
     }
@@ -960,33 +926,6 @@
     doLogout();
   }
 
-  function openPanel() {
-    // About: convert current rendered HTML back to plain text
-    const aboutHtml = document.getElementById('aboutText').innerHTML;
-    document.getElementById('aboutInput').value =
-      aboutHtml.replace(/<p>/g,'').replace(/<\/p>/g,'\n\n').trim();
-
-    // Current work description: pull from current DOM
-    document.getElementById('currentDescInput').value =
-      document.getElementById('currentDesc').textContent.trim();
-
-    // Projects: build 4 rows of name + link from current DOM
-    const wrap = document.getElementById('projectsInputs');
-    wrap.innerHTML = [1,2,3,4].map(i => {
-      const nameEl = document.getElementById('project' + i + 'Name');
-      const linkEl = document.getElementById('project' + i + 'Link');
-      const name = nameEl ? nameEl.textContent.trim() : '';
-      const url = (linkEl && linkEl.getAttribute('href')) ? linkEl.getAttribute('href') : '';
-      return `
-        <div class="project-input-row">
-          <input type="text" id="proj${i}NameInput" placeholder="Project ${i} name" value="${escapeAttr(name)}">
-          <input type="url" id="proj${i}LinkInput" placeholder="https://… (leave blank for Soon)" value="${escapeAttr(url)}">
-        </div>`;
-    }).join('');
-
-    open_('adminOverlay');
-  }
-
   function escapeAttr(s) {
     return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
@@ -1006,8 +945,7 @@
     timer = setTimeout(() => clicks = 0, 600);
     if (clicks >= 3) {
       clicks = 0;
-      if (loggedIn()) openPanel();
-      else open_('loginOverlay');
+      if (!loggedIn()) open_('loginOverlay');
     }
   });
 
@@ -1099,6 +1037,7 @@
 
     document.getElementById('profileOverlay').addEventListener('click', e => {
       e.stopPropagation();
+      if (!document.body.classList.contains('is-admin')) return;
       document.getElementById('picUpload').click();
     });
 
