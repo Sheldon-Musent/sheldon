@@ -249,6 +249,21 @@
       border-color: var(--mute-2);
     }
 
+    .resume-update {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--mute-3);
+      margin-left: 0.75rem;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .resume-update:hover { color: var(--white); }
+    body.is-admin .resume-update { display: inline; }
+
     /* ── Right sections ── */
     .section {
       margin-bottom: 7rem;
@@ -713,6 +728,8 @@
         <a href="mailto:chenchingnam39@gmail.com">Email</a>
       </div>
       <a href="Chen_Sheldon_Resume.pdf" class="resume-link" target="_blank">Resume PDF ↗</a>
+      <a class="resume-update" onclick="document.getElementById('resumeUpload').click()">↑ update</a>
+      <input type="file" id="resumeUpload" accept="application/pdf,.pdf" style="display:none" onchange="uploadResume(this)">
       <button class="save-btn" id="saveBtn" onclick="saveAndExit()">Save</button>
     </div>
   </aside>
@@ -1132,6 +1149,31 @@
     }
   }
 
+  /* ── Resume PDF ── */
+  async function uploadResume(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const link = document.querySelector('.resume-link');
+    const originalHref = link.getAttribute('href');
+    const originalText = link.textContent;
+    link.textContent = 'Uploading...';
+    const { error } = await supa.storage.from(BUCKET).upload('resume.pdf', file, {
+      upsert: true,
+      contentType: 'application/pdf'
+    });
+    if (error) {
+      alert('Upload failed: ' + error.message);
+      link.textContent = originalText;
+      link.setAttribute('href', originalHref);
+      input.value = '';
+      return;
+    }
+    const url = getPublicUrl('resume.pdf') + '?t=' + Date.now();
+    link.setAttribute('href', url);
+    link.textContent = originalText;
+    input.value = '';
+  }
+
   /* ── Showcase ── */
   async function uploadShowcase(input) {
     const files = Array.from(input.files).slice(0, 4);
@@ -1215,6 +1257,15 @@
       }
     }
     if (showcaseUrls.length > 0) renderShowcase(showcaseUrls);
+
+    // Load resume PDF from Supabase if it exists
+    try {
+      const resumeUrl = getPublicUrl('resume.pdf');
+      const res = await fetch(resumeUrl, { method: 'HEAD' });
+      if (res.ok) {
+        document.querySelector('.resume-link').setAttribute('href', resumeUrl + '?t=' + Date.now());
+      }
+    } catch(e) {}
 
     // Load editable content from Supabase
     const map = await loadContent();
