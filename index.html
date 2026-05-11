@@ -301,7 +301,8 @@
     .about-text p:last-child { margin-bottom: 0; }
 
     body.is-admin #aboutText,
-    body.is-admin #currentDesc {
+    body.is-admin #currentDesc,
+    body.is-admin #currentMeta {
       border: 1px dashed var(--border-2);
       padding: 0.75rem 1rem;
       outline: none;
@@ -836,7 +837,7 @@
     <!-- Current Work -->
     <section class="section" id="current">
       <div class="section-label">Current Work</div>
-      <p class="current-meta">Products & Design · April 2026 – Present</p>
+      <p class="current-meta" id="currentMeta">Products & Design · April 2026 – Present</p>
       <p id="currentDesc" style="font-size:13px;color:var(--mute-1);margin-bottom:2rem;line-height:1.7;">Shipped Chasecase42 following 42KL Piscine. Building SaaS applications and learning tools. Freelance graphic design.</p>
 
       <div class="project-item">
@@ -1017,6 +1018,7 @@
   async function saveAndExit() {
     await saveAbout();
     await saveCurrentDesc();
+    await saveCurrentMeta();
     localStorage.removeItem('s_auth');
     setAdminBodyClass();
   }
@@ -1174,6 +1176,11 @@
       if (isAdmin) currentEl.setAttribute('contenteditable', 'true');
       else currentEl.removeAttribute('contenteditable');
     }
+    const metaEl = document.getElementById('currentMeta');
+    if (metaEl) {
+      if (isAdmin) metaEl.setAttribute('contenteditable', 'true');
+      else metaEl.removeAttribute('contenteditable');
+    }
   }
 
   /* ── Showcase drag-reorder ── */
@@ -1289,6 +1296,16 @@
     const v = (el.innerText || '').trim();
     if (!v) return;
     const ok = await setContent('current_desc', v);
+    if (!ok) return;
+    el.textContent = v;
+  }
+
+  async function saveCurrentMeta() {
+    const el = document.getElementById('currentMeta');
+    if (!el) return;
+    const v = (el.innerText || '').trim();
+    if (!v) return;
+    const ok = await setContent('current_meta', v);
     if (!ok) return;
     el.textContent = v;
   }
@@ -1481,6 +1498,9 @@
     }
     if (map.current_desc) {
       document.getElementById('currentDesc').textContent = map.current_desc;
+    }
+    if (map.current_meta) {
+      document.getElementById('currentMeta').textContent = map.current_meta;
     }
     if (map.profile_pos) {
       const [x, y] = map.profile_pos.split(',').map(Number);
