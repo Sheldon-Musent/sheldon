@@ -561,6 +561,48 @@
     .save-fab:hover { color: var(--white); border-color: var(--mute-2); }
     body.is-admin .save-fab { display: inline-block; }
 
+    /* ── Profile remove ── */
+    .profile-remove {
+      display: none;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--mute-3);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .profile-remove:hover { color: var(--white); }
+    body.is-admin.has-pic .profile-remove { display: inline-block; }
+
+    /* ── Showcase remove ── */
+    .showcase-cell { position: relative; }
+
+    .showcase-remove {
+      display: none;
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 8, 8, 0.85);
+      border: 1px solid var(--border-2);
+      color: var(--mute-1);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    body.is-admin .showcase-remove { display: flex; }
+    body.is-admin .showcase-cell:hover .showcase-remove { opacity: 1; }
+    .showcase-remove:hover { color: var(--white); border-color: var(--mute-2); }
+
     /* ── Modals ── */
     .overlay {
       position: fixed;
@@ -729,6 +771,7 @@
           <div class="profile-overlay" id="profileOverlay">+</div>
         </div>
         <input type="file" id="picUpload" accept="image/*" style="display:none" onchange="uploadPic(this)">
+        <a class="profile-remove" onclick="removeProfile()">✕ remove</a>
       </div>
 
       <h1 class="name" id="nameEl">Sheldon</h1>
@@ -1012,6 +1055,17 @@
     const img = document.getElementById('profileImg');
     img.style.backgroundImage = `url("${src}")`;
     hasProfilePic = true;
+    document.body.classList.add('has-pic');
+  }
+
+  async function removeProfile() {
+    const paths = ['profile.jpeg', 'profile.jpg', 'profile.png', 'profile.webp'];
+    await supa.storage.from(BUCKET).remove(paths);
+    const img = document.getElementById('profileImg');
+    img.style.backgroundImage = '';
+    hasProfilePic = false;
+    document.body.classList.remove('has-pic');
+    localStorage.removeItem('s_pic_url');
   }
 
   function applyProfilePos() {
@@ -1225,21 +1279,41 @@
   async function loadShowcase() {
     const { data, error } = await supa.storage.from(BUCKET).list('showcase');
     if (error) { console.error('Showcase load failed:', error); renderShowcase([]); return; }
-    const urls = (data || [])
+    const items = (data || [])
       .filter(f => f.name && !f.name.endsWith('/'))
-      .map(f => getPublicUrl(`showcase/${f.name}`) + '?t=' + Date.now());
-    renderShowcase(urls);
+      .map(f => ({
+        path: `showcase/${f.name}`,
+        url: getPublicUrl(`showcase/${f.name}`) + '?t=' + Date.now()
+      }));
+    renderShowcase(items);
   }
 
-  function renderShowcase(imgs) {
+  function renderShowcase(items) {
     const grid = document.getElementById('showcaseGrid');
-    if (!imgs || imgs.length === 0) {
+    if (!items || items.length === 0) {
       grid.innerHTML = '';
       return;
     }
-    grid.innerHTML = imgs.map(src =>
-      `<div class="showcase-cell"><img src="${src}" alt="Showcase" onclick="openLightbox('${src}')"></div>`
-    ).join('');
+    grid.innerHTML = items.map(item => {
+      const url = typeof item === 'string' ? item : item.url;
+      const path = typeof item === 'string' ? '' : item.path;
+      return `<div class="showcase-cell" data-path="${path}">
+        <img src="${url}" alt="Showcase" onclick="openLightbox('${url}')">
+        <button class="showcase-remove" onclick="removeShowcaseImage(event)">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  async function removeShowcaseImage(e) {
+    e.stopPropagation();
+    const cell = e.target.closest('.showcase-cell');
+    if (!cell) return;
+    const path = cell.dataset.path;
+    if (path) {
+      const { error } = await supa.storage.from(BUCKET).remove([path]);
+      if (error) { alert('Remove failed: ' + error.message); return; }
+    }
+    cell.remove();
   }
 
   async function clearShowcase() {
