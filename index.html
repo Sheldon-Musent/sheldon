@@ -1473,7 +1473,13 @@
     let hasContent = false;
     for (let i = 4; i <= 10; i++) {
       const nameEl = document.getElementById('project' + i + 'Name');
-      if (nameEl && nameEl.textContent.trim()) { hasContent = true; break; }
+      if (!nameEl) continue;
+      const itemEl = nameEl.closest('.project-item');
+      if (!itemEl) continue;
+      if (nameEl.textContent.trim() && !itemEl.classList.contains('project-empty')) {
+        hasContent = true;
+        break;
+      }
     }
     toggle.style.display = hasContent ? 'inline-block' : 'none';
   }
