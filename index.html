@@ -74,8 +74,12 @@
 
     /* ── Profile photo (full-width circle) ── */
     .profile-wrap {
+      display: none;
       margin-bottom: 2rem;
     }
+
+    body.has-pic .profile-wrap,
+    body.is-admin .profile-wrap { display: block; }
 
     .profile-photo {
       width: min(100%, 200px);
@@ -602,6 +606,10 @@
     body.is-admin .showcase-remove { display: flex; }
     body.is-admin .showcase-cell:hover .showcase-remove { opacity: 1; }
     .showcase-remove:hover { color: var(--white); border-color: var(--mute-2); }
+
+    body.is-admin .showcase-cell[draggable="true"] { cursor: grab; }
+    body.is-admin .showcase-cell[draggable="true"]:active { cursor: grabbing; }
+    .showcase-cell.drag-over { opacity: 0.5; }
 
     /* ── Modals ── */
     .overlay {
@@ -1148,7 +1156,62 @@
   }
 
   function setAdminBodyClass() {
-    document.body.classList.toggle('is-admin', loggedIn());
+    const isAdmin = loggedIn();
+    document.body.classList.toggle('is-admin', isAdmin);
+    document.querySelectorAll('.showcase-cell').forEach(c => {
+      if (isAdmin) c.setAttribute('draggable', 'true');
+      else c.removeAttribute('draggable');
+    });
+  }
+
+  /* ── Showcase drag-reorder ── */
+  let draggedCell = null;
+
+  function setupShowcaseGridDrag() {
+    const grid = document.getElementById('showcaseGrid');
+    grid.addEventListener('dragstart', (e) => {
+      if (!document.body.classList.contains('is-admin')) { e.preventDefault(); return; }
+      const cell = e.target.closest('.showcase-cell');
+      if (!cell) return;
+      draggedCell = cell;
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', cell.dataset.path || ''); } catch(_) {}
+    });
+    grid.addEventListener('dragover', (e) => {
+      if (!draggedCell) return;
+      const cell = e.target.closest('.showcase-cell');
+      if (!cell || cell === draggedCell) return;
+      e.preventDefault();
+      grid.querySelectorAll('.showcase-cell.drag-over').forEach(c => {
+        if (c !== cell) c.classList.remove('drag-over');
+      });
+      cell.classList.add('drag-over');
+    });
+    grid.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const cell = e.target.closest('.showcase-cell');
+      if (!cell || !draggedCell || cell === draggedCell) return;
+      cell.classList.remove('drag-over');
+      const parent = cell.parentNode;
+      const placeholder = document.createElement('div');
+      parent.insertBefore(placeholder, draggedCell);
+      parent.insertBefore(draggedCell, cell);
+      parent.insertBefore(cell, placeholder);
+      parent.removeChild(placeholder);
+      await saveShowcaseOrder();
+    });
+    grid.addEventListener('dragend', () => {
+      draggedCell = null;
+      grid.querySelectorAll('.showcase-cell.drag-over').forEach(c => c.classList.remove('drag-over'));
+    });
+  }
+
+  async function saveShowcaseOrder() {
+    const grid = document.getElementById('showcaseGrid');
+    const paths = Array.from(grid.querySelectorAll('.showcase-cell'))
+      .map(c => c.dataset.path)
+      .filter(Boolean);
+    await setContent('showcase_order', paths.join(','));
   }
 
   /* ── Content (Supabase-backed) ── */
@@ -1279,12 +1342,25 @@
   async function loadShowcase() {
     const { data, error } = await supa.storage.from(BUCKET).list('showcase');
     if (error) { console.error('Showcase load failed:', error); renderShowcase([]); return; }
-    const items = (data || [])
+    let items = (data || [])
       .filter(f => f.name && !f.name.endsWith('/'))
       .map(f => ({
         path: `showcase/${f.name}`,
         url: getPublicUrl(`showcase/${f.name}`) + '?t=' + Date.now()
       }));
+
+    const { data: orderRow } = await supa.from('content').select('value').eq('key', 'showcase_order').maybeSingle();
+    const orderPaths = (orderRow && orderRow.value) ? orderRow.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+    if (orderPaths.length > 0) {
+      const byPath = new Map(items.map(i => [i.path, i]));
+      const ordered = [];
+      for (const p of orderPaths) {
+        if (byPath.has(p)) { ordered.push(byPath.get(p)); byPath.delete(p); }
+      }
+      for (const remaining of byPath.values()) ordered.push(remaining);
+      items = ordered;
+    }
+
     renderShowcase(items);
   }
 
@@ -1294,10 +1370,12 @@
       grid.innerHTML = '';
       return;
     }
+    const isAdmin = document.body.classList.contains('is-admin');
+    const dragAttr = isAdmin ? ' draggable="true"' : '';
     grid.innerHTML = items.map(item => {
       const url = typeof item === 'string' ? item : item.url;
       const path = typeof item === 'string' ? '' : item.path;
-      return `<div class="showcase-cell" data-path="${path}">
+      return `<div class="showcase-cell" data-path="${path}"${dragAttr}>
         <img src="${url}" alt="Showcase" onclick="openLightbox('${url}')">
         <button class="showcase-remove" onclick="removeShowcaseImage(event)">✕</button>
       </div>`;
@@ -1403,6 +1481,7 @@
     }
 
     setupProfileInteractions();
+    setupShowcaseGridDrag();
     setAdminBodyClass();
   }
 
