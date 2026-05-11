@@ -72,14 +72,17 @@
       padding: 5rem 0 5rem 5rem;
     }
 
-    /* ── Profile photo (banner) ── */
+    /* ── Profile photo (circle) ── */
     .profile-wrap {
       margin-bottom: 2rem;
+      display: flex;
+      justify-content: center;
     }
 
     .profile-photo {
-      width: 100%;
-      aspect-ratio: 4 / 3;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
       background: #111111;
       position: relative;
       overflow: hidden;
@@ -95,7 +98,6 @@
       background-size: cover;
       background-position: 50% 50%;
       background-repeat: no-repeat;
-      filter: grayscale(100%);
       transition: opacity 0.2s ease;
     }
 
@@ -477,27 +479,24 @@
       text-transform: uppercase;
     }
 
-    /* ── Admin trigger ── */
-    .admin-btn {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      width: 36px;
-      height: 36px;
-      background: var(--bg-3);
-      border: 1px solid var(--border-2);
-      border-radius: 50%;
+    /* ── Save button (visible when logged in) ── */
+    .save-btn {
       display: none;
-      align-items: center;
-      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: var(--white);
+      color: var(--bg);
+      border: none;
+      padding: 0.7rem 1.4rem;
       cursor: pointer;
-      font-size: 13px;
-      z-index: 100;
-      transition: border-color 0.2s;
+      margin-top: 1rem;
+      transition: background 0.2s;
     }
 
-    .admin-btn:hover { border-color: var(--mute-2); }
-    .admin-btn.show { display: flex; }
+    .save-btn:hover { background: var(--text-2); }
+    body.is-admin .save-btn { display: inline-block; }
 
     /* ── Modals ── */
     .overlay {
@@ -693,6 +692,7 @@
         <a href="mailto:chenchingnam39@gmail.com">Email</a>
       </div>
       <a href="Chen_Sheldon_Resume.pdf" class="resume-link" target="_blank">Resume PDF ↗</a>
+      <button class="save-btn" id="saveBtn" onclick="saveAndExit()">Save</button>
     </div>
   </aside>
 
@@ -844,9 +844,6 @@
   </main>
 </div>
 
-<!-- Admin gear button (shown after login) -->
-<button class="admin-btn" id="adminBtn" onclick="openPanel()" aria-label="Admin">⚙</button>
-
 <!-- Login modal -->
 <div class="overlay" id="loginOverlay">
   <div class="modal">
@@ -942,7 +939,6 @@
       close_('loginOverlay');
       document.getElementById('pwInput').value = '';
       err.style.display = 'none';
-      document.getElementById('adminBtn').classList.add('show');
       setAdminBodyClass();
       openPanel();
     } else {
@@ -952,9 +948,18 @@
 
   function doLogout() {
     localStorage.removeItem('s_auth');
-    document.getElementById('adminBtn').classList.remove('show');
     setAdminBodyClass();
     close_('adminOverlay');
+  }
+
+  async function saveAndExit() {
+    const aboutEl = document.getElementById('aboutInput');
+    const currentEl = document.getElementById('currentDescInput');
+    const hasProjects = document.getElementById('proj1NameInput');
+    if (aboutEl && aboutEl.value.trim()) await saveAbout();
+    if (currentEl && currentEl.value.trim()) await saveCurrentDesc();
+    if (hasProjects) await saveProjects();
+    doLogout();
   }
 
   function openPanel() {
@@ -1350,7 +1355,6 @@
 
     setupProfileInteractions();
     setAdminBodyClass();
-    if (loggedIn()) document.getElementById('adminBtn').classList.add('show');
   }
 
   init();
