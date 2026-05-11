@@ -683,6 +683,7 @@
           <div class="profile-photo-img" id="profileImg"></div>
           <div class="profile-overlay" id="profileOverlay">+</div>
         </div>
+        <input type="file" id="picUpload" accept="image/*" style="display:none" onchange="uploadPic(this)">
       </div>
 
       <h1 class="name" id="nameEl">Sheldon</h1>
@@ -876,9 +877,6 @@
   </div>
 </div>
 
-<!-- Save button (visible when logged in) -->
-<button class="save-fab" id="saveFab" onclick="doLogout()">Save</button>
-
 <script>
   /* ── Supabase ── */
   const SUPA_URL = 'https://fsafvjwfnvsdjpeyyhho.supabase.co';
@@ -913,17 +911,11 @@
   function doLogout() {
     localStorage.removeItem('s_auth');
     setAdminBodyClass();
-    close_('adminOverlay');
   }
 
-  async function saveAndExit() {
-    const aboutEl = document.getElementById('aboutInput');
-    const currentEl = document.getElementById('currentDescInput');
-    const hasProjects = document.getElementById('proj1NameInput');
-    if (aboutEl && aboutEl.value.trim()) await saveAbout();
-    if (currentEl && currentEl.value.trim()) await saveCurrentDesc();
-    if (hasProjects) await saveProjects();
-    doLogout();
+  function saveAndExit() {
+    localStorage.removeItem('s_auth');
+    setAdminBodyClass();
   }
 
   function escapeAttr(s) {
@@ -1108,7 +1100,6 @@
     const ok = await setContent('about', raw);
     if (!ok) return;
     document.getElementById('aboutText').innerHTML = html;
-    close_('adminOverlay');
   }
 
   /* ── Current Work ── */
@@ -1118,7 +1109,6 @@
     const ok = await setContent('current_desc', v);
     if (!ok) return;
     document.getElementById('currentDesc').textContent = v;
-    close_('adminOverlay');
   }
 
   /* ── Projects ── */
@@ -1139,7 +1129,6 @@
       const url  = document.getElementById('proj' + i + 'LinkInput').value.trim();
       applyProject(i, name, url);
     }
-    close_('adminOverlay');
   }
 
   /* ── Showcase ── */
@@ -1183,48 +1172,6 @@
     ]);
     localStorage.removeItem('s_showcase_urls');
     renderShowcase([]);
-  }
-
-  /* ── Export HTML (bake content in) ── */
-  function exportHTML() {
-    const clone = document.documentElement.cloneNode(true);
-
-    const pic = localStorage.getItem('s_pic');
-    if (pic) {
-      const img = clone.querySelector('#profileImg');
-      const ini = clone.querySelector('#profileInitials');
-      if (img) { img.src = pic; img.style.display = 'block'; }
-      if (ini) ini.style.display = 'none';
-    }
-
-    const about = localStorage.getItem('s_about');
-    if (about) {
-      const el = clone.querySelector('#aboutText');
-      if (el) el.innerHTML = about;
-    }
-
-    const showcase = localStorage.getItem('s_showcase');
-    if (showcase) {
-      const imgs = JSON.parse(showcase);
-      const grid = clone.querySelector('#showcaseGrid');
-      if (grid) {
-        const cells = [...imgs];
-        while (cells.length < 4) cells.push(null);
-        grid.innerHTML = cells.slice(0,4).map(src => src
-          ? `<div class="showcase-cell"><img src="${src}" alt="Showcase"></div>`
-          : `<div class="showcase-cell"><div class="showcase-empty">Upload</div></div>`
-        ).join('');
-      }
-    }
-
-    const html = '<!DOCTYPE html>\n' + clone.outerHTML;
-    const blob = new Blob([html], { type: 'text/html' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'index.html';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
   }
 
   /* ── Scroll spy ── */
