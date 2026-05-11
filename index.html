@@ -507,6 +507,8 @@
     }
 
     .modal input[type="password"],
+    .modal input[type="text"],
+    .modal input[type="url"],
     .modal textarea {
       width: 100%;
       background: var(--bg);
@@ -519,6 +521,15 @@
       margin-bottom: 1rem;
       transition: border-color 0.2s;
     }
+
+    .project-input-row {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .project-input-row input { margin-bottom: 0; }
 
     .modal input:focus,
     .modal textarea:focus { border-color: var(--mute-2); }
@@ -675,38 +686,38 @@
     <section class="section" id="current">
       <div class="section-label">Current Work</div>
       <p class="current-meta">Products & Design · April 2026 – Present</p>
-      <p style="font-size:13px;color:var(--mute-1);margin-bottom:2rem;line-height:1.7;">Shipped Chasecase42 following 42KL Piscine. Building SaaS applications and learning tools. Freelance graphic design.</p>
+      <p id="currentDesc" style="font-size:13px;color:var(--mute-1);margin-bottom:2rem;line-height:1.7;">Shipped Chasecase42 following 42KL Piscine. Building SaaS applications and learning tools. Freelance graphic design.</p>
 
       <div class="project-item">
         <div>
-          <div class="project-name">Chasecase42</div>
+          <div class="project-name" id="project1Name">Chasecase42</div>
           <div class="project-desc">Public learning tool for 42 Piscine students</div>
         </div>
-        <a href="https://sheldon-musent.github.io/chasecase42/" target="_blank" class="project-link">Live ↗</a>
+        <a id="project1Link" href="https://sheldon-musent.github.io/chasecase42/" target="_blank" class="project-link">Live ↗</a>
       </div>
 
       <div class="project-item">
         <div>
-          <div class="project-name">Equatorhub Studio</div>
+          <div class="project-name" id="project2Name">Equatorhub Studio</div>
           <div class="project-desc">Creative agency website & platform</div>
         </div>
-        <a href="https://studio-agency-lovat.vercel.app" target="_blank" class="project-link">Live ↗</a>
+        <a id="project2Link" href="https://studio-agency-lovat.vercel.app" target="_blank" class="project-link">Live ↗</a>
       </div>
 
       <div class="project-item">
         <div>
-          <div class="project-name">Pitgoal</div>
+          <div class="project-name" id="project3Name">Pitgoal</div>
           <div class="project-desc">Goal tracker PWA</div>
         </div>
-        <a href="https://github.com/Sheldon-Musent/Pitgoal" target="_blank" class="project-link">GitHub ↗</a>
+        <a id="project3Link" href="https://github.com/Sheldon-Musent/Pitgoal" target="_blank" class="project-link">GitHub ↗</a>
       </div>
 
       <div class="project-item">
         <div>
-          <div class="project-name">SHELDON</div>
+          <div class="project-name" id="project4Name">SHELDON</div>
           <div class="project-desc">This portfolio — in progress</div>
         </div>
-        <span class="project-link pending">Soon</span>
+        <a id="project4Link" class="project-link pending">Soon</a>
       </div>
     </section>
 
@@ -845,6 +856,22 @@
     </div>
 
     <div class="a-block">
+      <div class="a-label">Current Work Description</div>
+      <textarea id="currentDescInput" placeholder="Short description of what you're currently doing." style="min-height:80px;"></textarea>
+      <div class="m-row">
+        <button class="m-btn primary" onclick="saveCurrentDesc()">Save</button>
+      </div>
+    </div>
+
+    <div class="a-block">
+      <div class="a-label">Projects</div>
+      <div id="projectsInputs"></div>
+      <div class="m-row">
+        <button class="m-btn primary" onclick="saveProjects()">Save Projects</button>
+      </div>
+    </div>
+
+    <div class="a-block">
       <div class="a-label">Showcase Images (max 4)</div>
       <div class="upload-zone" onclick="document.getElementById('showcaseUpload').click()">
         Click to upload · JPG or PNG · select up to 4
@@ -903,12 +930,34 @@
   }
 
   function openPanel() {
-    const saved = localStorage.getItem('s_about');
-    if (saved) {
-      document.getElementById('aboutInput').value =
-        saved.replace(/<p>/g,'').replace(/<\/p>/g,'\n\n').trim();
-    }
+    // About: convert current rendered HTML back to plain text
+    const aboutHtml = document.getElementById('aboutText').innerHTML;
+    document.getElementById('aboutInput').value =
+      aboutHtml.replace(/<p>/g,'').replace(/<\/p>/g,'\n\n').trim();
+
+    // Current work description: pull from current DOM
+    document.getElementById('currentDescInput').value =
+      document.getElementById('currentDesc').textContent.trim();
+
+    // Projects: build 4 rows of name + link from current DOM
+    const wrap = document.getElementById('projectsInputs');
+    wrap.innerHTML = [1,2,3,4].map(i => {
+      const nameEl = document.getElementById('project' + i + 'Name');
+      const linkEl = document.getElementById('project' + i + 'Link');
+      const name = nameEl ? nameEl.textContent.trim() : '';
+      const url = (linkEl && linkEl.getAttribute('href')) ? linkEl.getAttribute('href') : '';
+      return `
+        <div class="project-input-row">
+          <input type="text" id="proj${i}NameInput" placeholder="Project ${i} name" value="${escapeAttr(name)}">
+          <input type="url" id="proj${i}LinkInput" placeholder="https://… (leave blank for Soon)" value="${escapeAttr(url)}">
+        </div>`;
+    }).join('');
+
     open_('adminOverlay');
+  }
+
+  function escapeAttr(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   function open_(id) { document.getElementById(id).classList.add('show'); }
@@ -952,13 +1001,90 @@
     ini.style.display = 'none';
   }
 
+  /* ── Content (Supabase-backed) ── */
+  async function setContent(key, value) {
+    const { error } = await supa
+      .from('content')
+      .upsert({ key, value }, { onConflict: 'key' });
+    if (error) { alert('Save failed: ' + error.message); return false; }
+    return true;
+  }
+
+  async function loadContent() {
+    const { data, error } = await supa.from('content').select('key,value');
+    if (error) { console.error('Load content failed:', error); return {}; }
+    const map = {};
+    (data || []).forEach(row => { map[row.key] = row.value; });
+    return map;
+  }
+
+  function aboutTextToHtml(raw) {
+    return raw.split(/\n\n+/).map(p => `<p>${escapeHtml(p.trim())}</p>`).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function applyProject(i, name, url) {
+    const nameEl = document.getElementById('project' + i + 'Name');
+    const linkEl = document.getElementById('project' + i + 'Link');
+    if (nameEl && name != null) nameEl.textContent = name;
+    if (!linkEl) return;
+    const trimmed = (url || '').trim();
+    if (!trimmed || trimmed.toLowerCase() === 'soon') {
+      linkEl.classList.add('pending');
+      linkEl.removeAttribute('href');
+      linkEl.removeAttribute('target');
+      linkEl.textContent = 'Soon';
+    } else {
+      linkEl.classList.remove('pending');
+      linkEl.href = trimmed;
+      linkEl.target = '_blank';
+      linkEl.rel = 'noopener';
+      linkEl.textContent = /github\.com/i.test(trimmed) ? 'GitHub ↗' : 'Live ↗';
+    }
+  }
+
   /* ── About ── */
-  function saveAbout() {
+  async function saveAbout() {
     const raw = document.getElementById('aboutInput').value.trim();
     if (!raw) return;
-    const html = raw.split(/\n\n+/).map(p => `<p>${p.trim()}</p>`).join('');
-    localStorage.setItem('s_about', html);
+    const html = aboutTextToHtml(raw);
+    const ok = await setContent('about', raw);
+    if (!ok) return;
     document.getElementById('aboutText').innerHTML = html;
+    close_('adminOverlay');
+  }
+
+  /* ── Current Work ── */
+  async function saveCurrentDesc() {
+    const v = document.getElementById('currentDescInput').value.trim();
+    if (!v) return;
+    const ok = await setContent('current_desc', v);
+    if (!ok) return;
+    document.getElementById('currentDesc').textContent = v;
+    close_('adminOverlay');
+  }
+
+  /* ── Projects ── */
+  async function saveProjects() {
+    const updates = [];
+    for (let i = 1; i <= 4; i++) {
+      const name = document.getElementById('proj' + i + 'NameInput').value.trim();
+      const url  = document.getElementById('proj' + i + 'LinkInput').value.trim();
+      updates.push({ key: 'project' + i + '_name', value: name });
+      updates.push({ key: 'project' + i + '_link', value: url });
+    }
+    const { error } = await supa
+      .from('content')
+      .upsert(updates, { onConflict: 'key' });
+    if (error) { alert('Save failed: ' + error.message); return; }
+    for (let i = 1; i <= 4; i++) {
+      const name = document.getElementById('proj' + i + 'NameInput').value.trim();
+      const url  = document.getElementById('proj' + i + 'LinkInput').value.trim();
+      applyProject(i, name, url);
+    }
     close_('adminOverlay');
   }
 
@@ -1088,8 +1214,20 @@
     }
     if (showcaseUrls.length > 0) renderShowcase(showcaseUrls);
 
-    const about = localStorage.getItem('s_about');
-    if (about) document.getElementById('aboutText').innerHTML = about;
+    // Load editable content from Supabase
+    const map = await loadContent();
+
+    if (map.about) {
+      document.getElementById('aboutText').innerHTML = aboutTextToHtml(map.about);
+    }
+    if (map.current_desc) {
+      document.getElementById('currentDesc').textContent = map.current_desc;
+    }
+    for (let i = 1; i <= 4; i++) {
+      const name = map['project' + i + '_name'];
+      const url  = map['project' + i + '_link'];
+      if (name != null || url != null) applyProject(i, name, url);
+    }
 
     if (loggedIn()) document.getElementById('adminBtn').classList.add('show');
   }
